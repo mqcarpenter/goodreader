@@ -234,26 +234,25 @@ document.addEventListener('DOMContentLoaded', () => {
         modalBody.innerHTML = '<div class="spinner"></div><p style="text-align:center;">Finding similar books...</p>';
         modalOverlay.classList.remove('hidden');
         try {
-            // Basic Google Books search for title/author keyword
+            // Open Library API search for title/author keyword
             const query = encodeURIComponent(`subject:"fiction" AND ("${title}" OR "${author}")`);
-            const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${query}&maxResults=5`);
+            const res = await fetch(`https://openlibrary.org/search.json?q=${query}&limit=5`);
             const data = await res.json();
 
             modalBody.innerHTML = '';
-            if (data.items && data.items.length > 0) {
-                data.items.forEach(item => {
-                    if (item.volumeInfo.title.toLowerCase() === title.toLowerCase()) return;
+            if (data.docs && data.docs.length > 0) {
+                data.docs.forEach(doc => {
+                    if (doc.title.toLowerCase() === title.toLowerCase()) return;
 
-                    const vol = item.volumeInfo;
                     const card = document.createElement('div');
                     card.className = 'book-card';
-                    const img = vol.imageLinks ? vol.imageLinks.thumbnail : 'https://s.gr-assets.com/assets/nophoto/book/111x148-bcc042a9c91a29c1d680899eff700a03.png';
-                    const authors = vol.authors ? vol.authors.join(', ') : 'Unknown Author';
+                    const img = doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : 'https://s.gr-assets.com/assets/nophoto/book/111x148-bcc042a9c91a29c1d680899eff700a03.png';
+                    const authors = doc.author_name ? doc.author_name.join(', ') : 'Unknown Author';
 
                     card.innerHTML = `
                         <img src="${img}" class="book-cover">
                         <div class="book-info">
-                            <h3 class="book-title">${vol.title}</h3>
+                            <h3 class="book-title">${doc.title}</h3>
                             <p class="book-author">${authors}</p>
                             <button class="secondary-btn" onclick="alert('Added to local Want to Read!')">Want to Read</button>
                         </div>
