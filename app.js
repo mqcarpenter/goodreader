@@ -17,9 +17,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const ocrStatus = document.getElementById('ocr-status');
     const scannerPreview = document.getElementById('scanner-preview');
     const scannerResults = document.getElementById('scanner-results');
+    const exportContainer = document.getElementById('export-container');
+    const exportCsvBtn = document.getElementById('export-csv-btn');
 
     // State
     const STORAGE_KEY = 'goodreads_user_id';
+    const CUSTOM_TO_READ_KEY = 'goodreads_custom_to_read';
     let currentShelf = 'read';
 
     // Initialization
@@ -68,12 +71,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const userId = localStorage.getItem(STORAGE_KEY);
             if (currentShelf === 'scanner') {
                 booksContainer.classList.add('hidden');
+                exportContainer.classList.add('hidden');
                 scannerContainer.classList.remove('hidden');
                 loadingSpinner.classList.add('hidden');
                 hideError();
             } else {
                 booksContainer.classList.remove('hidden');
                 scannerContainer.classList.add('hidden');
+                if (currentShelf === 'to-read') {
+                    exportContainer.classList.remove('hidden');
+                } else {
+                    exportContainer.classList.add('hidden');
+                }
+
                 if (userId) {
                     fetchBooks(userId, currentShelf);
                 }
@@ -98,6 +108,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Event Listener for OCR scanner
     cameraInput.addEventListener('change', handleImageUpload);
+
+    // Event Listener for Export CSV
+    exportCsvBtn.addEventListener('click', exportToCSV);
+
+    // Helper: Save custom book
+    function saveCustomBook(title, author, img) {
+        let saved = JSON.parse(localStorage.getItem(CUSTOM_TO_READ_KEY) || '[]');
+        // Avoid duplicates
+        if (!saved.some(b => b.title === title)) {
+            saved.push({ title, author, imageUrl: img });
+            localStorage.setItem(CUSTOM_TO_READ_KEY, JSON.stringify(saved));
+        }
+    }
 
     // UI Functions
     function showSetupScreen() {
@@ -149,8 +172,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const data = await response.json();
 
-            if (data.books && data.books.length > 0) {
-                renderBooks(data.books, shelf);
+            let booksToRender = data.books || [];
+
+            // If on 'to-read' shelf, append our local custom books
+            if (shelf === 'to-read') {
+                const localBooks = JSON.parse(localStorage.getItem(CUSTOM_TO_READ_KEY) || '[]');
+                booksToRender = [...localBooks, ...booksToRender];
+            }
+
+            if (booksToRender.length > 0) {
+                renderBooks(booksToRender, shelf);
             } else {
                 renderEmptyState();
             }
@@ -254,7 +285,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="book-info">
                             <h3 class="book-title">${doc.title}</h3>
                             <p class="book-author">${authors}</p>
-                            <button class="secondary-btn" onclick="alert('Added to local Want to Read!')">Want to Read</button>
+                            <button class="secondary-btn" onclick="
+                                const saved = JSON.parse(localStorage.getItem('${CUSTOM_TO_READ_KEY}') || '[]');
+                                if (!saved.some(b => b.title === '${doc.title.replace(/'/g, "\\'")}')) {
+                                    saved.push({ title: '${doc.title.replace(/'/g, "\\'")}', author: '${authors.replace(/'/g, "\\'")}', imageUrl: '${img}' });
+                                    localStorage.setItem('${CUSTOM_TO_READ_KEY}', JSON.stringify(saved));
+                                    alert('Added to local Want to Read list!');
+                                } else {
+                                    alert('Already in your list!');
+                                }
+                            ">Want to Read</button>
                         </div>
                     `;
                     modalBody.appendChild(card);
@@ -325,6 +365,31 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             ocrStatus.innerHTML = `<span style="color:#ff4c4c">Error during scanning: ${err.message}</span>`;
         }
+    }
+
+    // CSV Export
+    function exportToCSV() {
+        const localBooks = JSON.parse(localStorage.getItem(CUSTOM_TO_READ_KEY) || '[]');
+        if (localBooks.length === 0) {
+            alert("You don't have any locally saved recommendations to export yet.");
+            return;
+        }
+
+        // Goodreads required column headers
+        const headers = ['Title', 'Author', 'Exclusive Shelf'];
+
+        let csvContent = "data:text/csv;charset=utf-8,"
+            + headers.join(',') + '\n'
+            + localBooks.map(b => `"${b.title.replace(/"/g, '""')}","${b.author.replace(/"/g, '""')}","to-read"`).join('\n');
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "goodreads_import.csv");
+        document.body.appendChild(link); // Required for FF
+
+        link.click(); // This will download the data file
+        document.body.removeChild(link);
     }
 
     // Start App
