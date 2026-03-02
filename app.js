@@ -36,7 +36,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Event Listeners
     saveSettingsBtn.addEventListener('click', () => {
-        const userId = userIdInput.value.trim();
+        let userIdRaw = userIdInput.value.trim();
+        // Extract ID if they pasted a full URL
+        const match = userIdRaw.match(/(\d+(?:-[a-zA-Z0-9_-]+)?)/);
+        const userId = match ? match[1] : userIdRaw;
+
         if (userId) {
             localStorage.setItem(STORAGE_KEY, userId);
             showMainScreen();
