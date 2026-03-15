@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // State
     const STORAGE_KEY = 'goodreads_user_id';
     const CUSTOM_TO_READ_KEY = 'goodreads_custom_to_read';
+    const CUSTOM_READ_KEY = 'goodreads_custom_read';
     let currentShelf = 'read';
 
     // Initialization
@@ -178,6 +179,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (shelf === 'to-read') {
                 const localBooks = JSON.parse(localStorage.getItem(CUSTOM_TO_READ_KEY) || '[]');
                 booksToRender = [...localBooks, ...booksToRender];
+            } else if (shelf === 'read') {
+                const localBooks = JSON.parse(localStorage.getItem(CUSTOM_READ_KEY) || '[]');
+                booksToRender = [...localBooks, ...booksToRender];
             }
 
             if (booksToRender.length > 0) {
@@ -233,6 +237,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 metaText = `Avg Rating: ${book.averageRating}`;
             }
 
+            // Generate Description HTML
+            let descHtml = '';
+            if (book.description) {
+                // Remove HTML tags
+                let cleanDesc = book.description.replace(/<[^>]*>?/gm, '').replace(/\s+/g, ' ').trim();
+                // Extract exactly two sentences
+                let sentences = cleanDesc.match(/[^.!?]+[.!?]+/g) || [];
+                let twoSentences = sentences.slice(0, 2).join(' ').trim();
+                if (!twoSentences) twoSentences = cleanDesc.substring(0, 100) + '...';
+                descHtml = `<p class="book-desc" style="font-size: 0.8rem; margin-top: 10px; margin-bottom: 10px; color: var(--text-primary); border-top: 1px dashed var(--text-primary); padding-top: 8px;">${twoSentences}</p>`;
+            }
+
             card.innerHTML = `
                 <img src="${imgUrl}" alt="Cover of ${cleanTitle}" class="book-cover" loading="lazy">
                 <div class="book-info">
@@ -241,6 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="stars-container">
                         ${starsHtml}
                     </div>
+                    ${descHtml}
                     <div class="book-meta">${metaText}</div>
                     ${book.userRating >= 4 ? `<button class="secondary-btn recommend-btn" data-title="${encodeURIComponent(cleanTitle)}" data-author="${encodeURIComponent(book.author)}">Find Similar</button>` : ''}
                 </div>
@@ -280,21 +297,45 @@ document.addEventListener('DOMContentLoaded', () => {
                     const img = doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : 'https://s.gr-assets.com/assets/nophoto/book/111x148-bcc042a9c91a29c1d680899eff700a03.png';
                     const authors = doc.author_name ? doc.author_name.join(', ') : 'Unknown Author';
 
+                    // Generate context explanation
+                    let contextText = '';
+                    if (doc.subject) {
+                        let subjects = doc.subject.slice(0, 2).join(', ');
+                        contextText += `Themes: ${subjects}. `;
+                    }
+                    if (doc.number_of_pages_median) {
+                        contextText += `Est. ${doc.number_of_pages_median} pages.`;
+                    }
+                    if (!contextText) contextText = `Similar author or style.`;
+                    
+                    const cleanContext = contextText.replace(/'/g, "\\'");
+
                     card.innerHTML = `
                         <img src="${img}" class="book-cover">
                         <div class="book-info">
                             <h3 class="book-title">${doc.title}</h3>
                             <p class="book-author">${authors}</p>
+                            <p class="text-secondary" style="font-size: 0.75rem; margin-bottom: 8px;"><em>Suggested because: ${contextText}</em></p>
                             <button class="secondary-btn" onclick="
                                 const saved = JSON.parse(localStorage.getItem('${CUSTOM_TO_READ_KEY}') || '[]');
                                 if (!saved.some(b => b.title === '${doc.title.replace(/'/g, "\\'")}')) {
-                                    saved.push({ title: '${doc.title.replace(/'/g, "\\'")}', author: '${authors.replace(/'/g, "\\'")}', imageUrl: '${img}' });
+                                    saved.push({ title: '${doc.title.replace(/'/g, "\\'")}', author: '${authors.replace(/'/g, "\\'")}', imageUrl: '${img}', description: '${cleanContext}' });
                                     localStorage.setItem('${CUSTOM_TO_READ_KEY}', JSON.stringify(saved));
                                     alert('Added to local Want to Read list!');
                                 } else {
                                     alert('Already in your list!');
                                 }
                             ">Want to Read</button>
+                            <button class="secondary-btn" style="margin-top: 5px;" onclick="
+                                const savedRead = JSON.parse(localStorage.getItem('${CUSTOM_READ_KEY}') || '[]');
+                                if (!savedRead.some(b => b.title === '${doc.title.replace(/'/g, "\\'")}')) {
+                                    savedRead.push({ title: '${doc.title.replace(/'/g, "\\'")}', author: '${authors.replace(/'/g, "\\'")}', imageUrl: '${img}', description: '${cleanContext}' });
+                                    localStorage.setItem('${CUSTOM_READ_KEY}', JSON.stringify(savedRead));
+                                    alert('Added to Read list!');
+                                } else {
+                                    alert('Already in your Read list!');
+                                }
+                            ">Mark as Read</button>
                         </div>
                     `;
                     modalBody.appendChild(card);

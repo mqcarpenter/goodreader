@@ -63,6 +63,7 @@ if (isset($xml->channel->item)) {
         $author = (string)$item->author_name;
         $link = (string)$item->link;
         $imageUrl = (string)$item->book_image_url;
+        $description = (string)$item->book_description;
         $userRating = (int)$item->user_rating;
         $averageRating = (float)$item->average_rating;
         $readAt = (string)$item->user_read_at;
@@ -72,6 +73,7 @@ if (isset($xml->channel->item)) {
             'author' => $author,
             'link' => $link,
             'imageUrl' => $imageUrl,
+            'description' => $description,
             'userRating' => $userRating,
             'averageRating' => $averageRating,
             'readAt' => $readAt
